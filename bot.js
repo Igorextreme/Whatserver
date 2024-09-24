@@ -75,7 +75,7 @@ client.on('message', async (message) => {
     // Recuperar ou criar uma sessão de chat para o usuário
     let chatSession = chatSessions[message.from];
     
-    if (!chatSession || !chatSession.isActive()) {
+    if (!chatSession) {
       chatSession = model.startChat({
         generationConfig,
         history: [],
