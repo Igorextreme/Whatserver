@@ -48,22 +48,6 @@ client.on('ready', () => {
   console.log('Bot está pronto!');
 });
 
-// Função para gerenciar o histórico de tokens
-function limitHistory(history, maxTokens) {
-  let totalTokens = 0;
-  const limitedHistory = [];
-
-  for (let i = history.length - 1; i >= 0; i--) {
-    const messageTokens = history[i].tokens || history[i].text.split(' ').length;
-    totalTokens += messageTokens;
-
-    if (totalTokens > maxTokens) break;
-    limitedHistory.unshift(history[i]);
-  }
-
-  return limitedHistory;
-}
-
 // Evento que será disparado ao receber uma mensagem
 client.on('message', async (message) => {
   console.log(`Mensagem recebida de ${message.from}: ${message.body}`);
@@ -82,9 +66,6 @@ client.on('message', async (message) => {
       });
       chatSessions[message.from] = chatSession;
     }
-
-    // Limitar o histórico para evitar problemas de limite de tokens
-    chatSession.history = limitHistory(chatSession.history, 8000); // Ajustar conforme necessário
 
     // Enviar a mensagem recebida para a API do Gemini
     const result = await chatSession.sendMessage(message.body);
@@ -108,32 +89,15 @@ wss.on('connection', (ws) => {
 
   // Função de keep-alive que envia um "ping" a cada 5 minutos (300000 ms)
   const keepAliveInterval = setInterval(() => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send('ping');
-      console.log('Ping enviado para manter o bot ativo');
-    }
-  }, 300000); // 5 minutos
+    ws.send('ping');
+    console.log('Ping enviado para manter o bot ativo');
+  }, 30000); // 5 minutos
 
   ws.on('close', () => {
     clearInterval(keepAliveInterval);
     console.log('Conexão WebSocket encerrada');
   });
 });
-
-// Função para reconectar se o cliente desconectar
-client.on('disconnected', (reason) => {
-  console.log('Cliente WhatsApp desconectado', reason);
-  // Tente reconectar o cliente
-  client.initialize();
-});
-
-// Verifica se o cliente ainda está conectado a cada 10 minutos
-setInterval(() => {
-  if (!client.info) {
-    console.log('O cliente WhatsApp parece estar desconectado, tentando reconectar...');
-    client.initialize();
-  }
-}, 600000); // 10 minutos
 
 // Iniciar o cliente WhatsApp
 client.initialize();
