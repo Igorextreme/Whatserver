@@ -91,7 +91,7 @@ wss.on('connection', (ws) => {
   const keepAliveInterval = setInterval(() => {
     ws.send('ping');
     console.log('Ping enviado para manter o bot ativo');
-  }, 300000); // 5 minutos
+  }, 300); // 5 minutos
 
   ws.on('close', () => {
     clearInterval(keepAliveInterval);
