@@ -87,17 +87,18 @@ client.on('message', async (message) => {
 wss.on('connection', (ws) => {
   console.log('Nova conexão WebSocket estabelecida');
 
-  // Função de keep-alive que envia um "ping" a cada 5 minutos (300000 ms)
+  // Função de keep-alive que envia um "ping" a cada 30 segundos
   const keepAliveInterval = setInterval(() => {
     ws.send('ping');
     console.log('Ping enviado para manter o bot ativo');
-  }, 30000); // 5 minutos
+  }, 30000); // 30 segundos
 
   ws.on('close', () => {
     clearInterval(keepAliveInterval);
     console.log('Conexão WebSocket encerrada');
   });
 });
+
 
 // Configurar reconexão automática a cada 10 minutos
 setInterval(() => {
