@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QR Code WhatsApp</title>
+</head>
+<body>
+    <h1>QR Code do WhatsApp</h1>
+    <pre id="qrCode"></pre>
+
+    <script>
+        const ws = new WebSocket('https://whatserver-vx1g.onrender.com');
+
+        ws.onmessage = function(event) {
+            document.getElementById('qrCode').textContent = event.data;
+        };
+
+        ws.onopen = function() {
+            console.log('Conectado ao WebSocket');
+        };
+
+        ws.onclose = function() {
+            console.log('WebSocket desconectado');
+        };
+    </script>
+</body>
+</html>
+
