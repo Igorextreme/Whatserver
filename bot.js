@@ -98,6 +98,10 @@ wss.on('connection', (ws) => {
     console.log('Conexão WebSocket encerrada');
   });
 });
+// Adicione uma rota básica para manter o bot ativo
+app.get('/', (req, res) => {
+  res.send('Bot está ativo!');
+});
 
 
 // Configurar reconexão automática a cada 10 minutos
