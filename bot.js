@@ -103,7 +103,15 @@ app.get('/', (req, res) => {
   res.send('Bot está ativo!');
 });
 
-
+// Configurar reconexão automática a cada 10 minutos
+setInterval(() => {
+  console.log('Reconectando o WhatsApp Web...');
+  client.destroy().then(() => {
+    client.initialize();  // Forçar reconexão
+  }).catch(error => {
+    console.error('Erro ao tentar reconectar o WhatsApp:', error);
+  });
+}, 1200000); // A cada 10 minutos (600.000 ms)
 
 // Iniciar o cliente WhatsApp
 client.initialize();
