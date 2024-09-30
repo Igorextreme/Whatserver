@@ -1,21 +1,22 @@
 // Importar bibliotecas necessárias
 const qrcode = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
+const { GoogleAIFileManager } = require('@google/generative-ai/server');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
+const fs = require('fs');
 
 // Configurar o servidor Express e WebSocket
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Sua chave da API do Gemini
+// Configurar as chaves da API do Gemini
 const GEMINI_API_KEY = 'AIzaSyA1PwVsVYDTgT65ozZ87A6bq5CGv9aEuLA';
-
-// Configurar a API do Gemini
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const fileManager = new GoogleAIFileManager(GEMINI_API_KEY);
 
 const model = genAI.getGenerativeModel({
   model: "gemini-1.5-flash",
@@ -35,7 +36,7 @@ const chatSessions = {};
 
 // Inicializar o cliente WhatsApp
 const client = new Client({
-  authStrategy: new LocalAuth()  // Isso salvará sua sessão localmente
+  authStrategy: new LocalAuth()
 });
 
 // Quando o QR code é gerado, exibi-lo no terminal
@@ -53,30 +54,61 @@ client.on('message', async (message) => {
   console.log(`Mensagem recebida de ${message.from}: ${message.body}`);
 
   // Evitar que o bot responda a si mesmo ou a mensagens vazias
-  if (message.fromMe || !message.body) return;
+  if (message.fromMe || (!message.body && !message.hasMedia)) return;
 
   try {
-    // Recuperar ou criar uma sessão de chat para o usuário
-    let chatSession = chatSessions[message.from];
-    
-    if (!chatSession) {
-      chatSession = model.startChat({
-        generationConfig,
-        history: [],
+    // Processar mensagens com mídia (imagem)
+    if (message.hasMedia) {
+      const media = await message.downloadMedia();
+      const filePath = `./uploads/${message.from}_image.jpg`;
+      
+      // Salvar a imagem
+      fs.writeFileSync(filePath, media.data, 'base64');
+
+      // Fazer upload da imagem para o Gemini
+      const uploadResult = await fileManager.uploadFile(filePath, {
+        mimeType: media.mimetype,
+        displayName: `Imagem de ${message.from}`
       });
-      chatSessions[message.from] = chatSession;
+
+
+// Obter uma resposta do modelo com base na imagem
+const result = await model.generateContent([
+  "Você é um especialista em Pokémon. Imagine que Voce tem uma pokedex dentro de voce com todas as imagens detalhes corest habitates etc. Voce conhece todos os Pomemons so de olhar como se fosse a propria pokedex. Analise a imagem fornecida de forma detalhada e precisa. Considere os seguintes aspectos para identificar corretamente o Pokémon: cor principal, padrões de cor, formato do corpo, tipo de orelha, formato dos olhos, presença de cauda e suas características, detalhes das patas, além de elementos específicos como chamas, folhas, raios, conchas ou espinhos. Compare cuidadosamente a imagem com todos os Pokémon conhecidos e forneça os três mais prováveis, mencionando em detalhes por que cada um deles pode ser a melhor opção. Se possível, inclua informações sobre o tipo de Pokémon (água, fogo, planta, etc.), habilidades, evoluções e qualquer característica que ajude a confirmar a identificação. Seja o mais preciso e cuidadoso possível, e evite suposições.",
+  {
+    fileData: {
+      fileUri: uploadResult.file.uri,
+      mimeType: uploadResult.file.mimeType,
+    },
+  },
+]);
+
+      const responseText = result.response.text();
+      await message.reply(responseText);
+      console.log(`Resposta enviada para ${message.from}: ${responseText}`);
+
+      // Excluir a imagem após o processamento
+      fs.unlinkSync(filePath);
+    } else {
+      // Processar mensagens de texto
+      let chatSession = chatSessions[message.from];
+
+      if (!chatSession) {
+        chatSession = model.startChat({
+          generationConfig,
+          history: [],
+        });
+        chatSessions[message.from] = chatSession;
+      }
+
+      // Enviar a mensagem para a API do Gemini
+      const result = await chatSession.sendMessage(message.body);
+      const responseText = result.response.text();
+
+      // Enviar a resposta para o remetente no WhatsApp
+      await message.reply(responseText);
+      console.log(`Resposta enviada para ${message.from}: ${responseText}`);
     }
-
-    // Enviar a mensagem recebida para a API do Gemini
-    const result = await chatSession.sendMessage(message.body);
-
-    // Extrair a resposta gerada
-    const resposta = result.response.text();
-
-    // Enviar a resposta de volta para o remetente no WhatsApp
-    await message.reply(resposta);
-
-    console.log(`Resposta enviada para ${message.from}: ${resposta}`);
   } catch (error) {
     console.error('Erro ao processar a mensagem:', error);
     message.reply('Desculpe, ocorreu um erro ao processar sua mensagem.');
@@ -86,37 +118,36 @@ client.on('message', async (message) => {
 // Função de Keep-Alive para manter o WebSocket ativo
 wss.on('connection', (ws) => {
   console.log('Nova conexão WebSocket estabelecida');
-
-  // Função de keep-alive que envia um "ping" a cada 30 segundos
   const keepAliveInterval = setInterval(() => {
     ws.send('ping');
     console.log('Ping enviado para manter o bot ativo');
-  }, 30000); // 30 segundos
+  }, 30000);
 
   ws.on('close', () => {
     clearInterval(keepAliveInterval);
     console.log('Conexão WebSocket encerrada');
   });
 });
-// Adicione uma rota básica para manter o bot ativo
+
+// Rota básica para verificar se o bot está ativo
 app.get('/', (req, res) => {
   res.send('Bot está ativo!');
 });
 
-// Configurar reconexão automática a cada 10 minutos
+// Configurar reconexão automática
 setInterval(() => {
   console.log('Reconectando o WhatsApp Web...');
   client.destroy().then(() => {
-    client.initialize();  // Forçar reconexão
+    client.initialize();
   }).catch(error => {
     console.error('Erro ao tentar reconectar o WhatsApp:', error);
   });
-}, 1200000); // A cada 10 minutos (600.000 ms)
+}, 600000); // A cada 10 minutos
 
 // Iniciar o cliente WhatsApp
 client.initialize();
 
-// Configurando a porta do servidor
+// Configurar a porta do servidor
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Servidor WebSocket rodando na porta ${PORT}`);
