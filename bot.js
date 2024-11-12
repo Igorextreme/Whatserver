@@ -14,7 +14,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // Configurar as chaves da API do Gemini
-const GEMINI_API_KEY = 'AIzaSyA1PwVsVYDTgT65ozZ87A6bq5CGv9aEuLA';
+const GEMINI_API_KEY = 'AIzaSyDen_cVqAQB2z-ZvwQcLE6vliCe2Pt-LiY';
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const fileManager = new GoogleAIFileManager(GEMINI_API_KEY);
 
